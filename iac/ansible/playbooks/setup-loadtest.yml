@@ -1,0 +1,33 @@
+---
+# ============================================================
+# Playbook: Configuración idempotente de la VM de Load-Testing
+# Instala: Python3, pip, Locust y dependencias
+# ============================================================
+- name: Configure Load-Test VM
+  hosts: loadtest
+  become: true
+  gather_facts: true
+
+  vars:
+    locust_version: "2.24.0"
+    app_user: ubuntu
+    locust_dir: /home/ubuntu/loadtest
+
+  pre_tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  roles:
+    - role: loadtester
+
+  post_tasks:
+    - name: Verify Locust installation
+      ansible.builtin.command: locust --version
+      register: locust_ver
+      changed_when: false
+
+    - name: Show Locust version
+      ansible.builtin.debug:
+        msg: "Locust {{ locust_ver.stdout }} installed successfully"

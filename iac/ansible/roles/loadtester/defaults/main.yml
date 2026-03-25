@@ -1,0 +1,5 @@
+---
+locust_version: "2.24.0"
+app_user: ubuntu
+locust_dir: /home/ubuntu/loadtest
+locust_host: "http://localhost"
