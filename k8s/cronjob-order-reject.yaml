@@ -1,0 +1,74 @@
+# ============================================================
+# CronJob: Rechazo automático de órdenes abandonadas
+# Ejecuta cada 5 minutos. Busca órdenes en estado "CREADA"
+# que no hayan sido aceptadas en más de 1 hora y las marca
+# como "RECHAZADA", notificando al cliente (anti-spam).
+# ============================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: order-auto-reject
+  namespace: delivereats
+  labels:
+    app: order-auto-reject
+    component: cronjob
+spec:
+  schedule: "*/5 * * * *" # Cada 5 minutos
+  concurrencyPolicy: Forbid # Evita ejecuciones concurrentes
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 60
+
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 120 # Timeout del pod: 2 minutos
+      template:
+        metadata:
+          labels:
+            app: order-auto-reject
+            component: cronjob
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: order-reject-worker
+              image: node:18-alpine
+              command: ["node", "/app/scripts/auto-reject-orders.js"]
+              env:
+                - name: DB_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: delivereats-secrets
+                      key: DB_HOST
+                - name: DB_PORT
+                  valueFrom:
+                    configMapKeyRef:
+                      name: delivereats-config
+                      key: DB_PORT
+                - name: DB_USER
+                  valueFrom:
+                    configMapKeyRef:
+                      name: delivereats-config
+                      key: DB_USER
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: delivereats-secrets
+                      key: DB_PASSWORD
+                - name: DB_NAME
+                  value: "orders_db"
+                - name: RABBITMQ_URL
+                  valueFrom:
+                    configMapKeyRef:
+                      name: delivereats-config
+                      key: RABBITMQ_URL
+                - name: ORDER_TIMEOUT_MINUTES
+                  value: "60"
+              volumeMounts:
+                - name: scripts
+                  mountPath: /app/scripts
+          volumes:
+            - name: scripts
+              configMap:
+                name: order-reject-script
+                defaultMode: 0755

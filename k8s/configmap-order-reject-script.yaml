@@ -1,0 +1,132 @@
+# ============================================================
+# ConfigMap con el script del CronJob de rechazo de órdenes
+# ============================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: order-reject-script
+  namespace: delivereats
+  labels:
+    app: order-auto-reject
+    component: cronjob
+data:
+  auto-reject-orders.js: |
+    #!/usr/bin/env node
+    /**
+     * auto-reject-orders.js
+     * 
+     * Busca órdenes en estado CREADA que lleven más de ORDER_TIMEOUT_MINUTES
+     * sin ser aceptadas y las cambia a RECHAZADA.
+     * 
+     * Anti-spam: Verifica la tabla order_notifications antes de enviar
+     * para no duplicar el envío.
+     */
+    const { Pool } = require('pg');
+    const amqp = require('amqplib');
+
+    const pool = new Pool({
+      host:     process.env.DB_HOST,
+      port:     parseInt(process.env.DB_PORT || '5432'),
+      user:     process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+    });
+
+    const TIMEOUT_MINUTES = parseInt(process.env.ORDER_TIMEOUT_MINUTES || '60');
+    const RABBITMQ_URL    = process.env.RABBITMQ_URL;
+
+    async function run() {
+      const client = await pool.connect();
+      let connection;
+      let rejectedCount  = 0;
+      let notifiedCount  = 0;
+      let skippedSpam    = 0;
+
+      try {
+        console.log(`[auto-reject] Starting. Timeout threshold: ${TIMEOUT_MINUTES} min`);
+
+        // 1. Obtener órdenes CREADA expiradas
+        const { rows: orders } = await client.query(`
+          SELECT id, customer_id, customer_email, created_at
+          FROM orders
+          WHERE status = 'CREADA'
+            AND created_at < NOW() - INTERVAL '${TIMEOUT_MINUTES} minutes'
+          ORDER BY created_at ASC
+        `);
+
+        console.log(`[auto-reject] Found ${orders.length} expired order(s)`);
+        if (orders.length === 0) {
+          console.log('[auto-reject] Nothing to do. Exiting.');
+          return;
+        }
+
+        // 2. Publicar eventos en RabbitMQ para que notification-service notifique
+        connection = await amqp.connect(RABBITMQ_URL);
+        const channel = await connection.createChannel();
+        await channel.assertQueue('order.rejected', { durable: true });
+
+        for (const order of orders) {
+          await client.query('BEGIN');
+          try {
+            // Marcar como RECHAZADA
+            await client.query(
+              "UPDATE orders SET status = 'RECHAZADA', updated_at = NOW() WHERE id = $1",
+              [order.id]
+            );
+
+            // Anti-spam: verificar si ya fue notificada
+            const { rows: existing } = await client.query(
+              "SELECT 1 FROM order_notifications WHERE order_id = $1 AND type = 'RECHAZO'",
+              [order.id]
+            );
+
+            if (existing.length > 0) {
+              console.log(`[auto-reject] Order ${order.id} already notified – skipping email`);
+              skippedSpam++;
+            } else {
+              // Registrar notificación (anti-spam)
+              await client.query(
+                `INSERT INTO order_notifications (order_id, type, sent_at)
+                 VALUES ($1, 'RECHAZO', NOW())`,
+                [order.id]
+              );
+
+              // Publicar en cola para notification-service
+              const msg = {
+                event:      'ORDER_REJECTED',
+                orderId:    order.id,
+                customerId: order.customer_id,
+                email:      order.customer_email,
+                reason:     `Tu orden no fue aceptada por el restaurante en ${TIMEOUT_MINUTES} minutos.`,
+                timestamp:  new Date().toISOString(),
+              };
+              channel.sendToQueue(
+                'order.rejected',
+                Buffer.from(JSON.stringify(msg)),
+                { persistent: true }
+              );
+              notifiedCount++;
+              console.log(`[auto-reject] Order ${order.id} rejected and queued for notification`);
+            }
+
+            rejectedCount++;
+            await client.query('COMMIT');
+          } catch (err) {
+            await client.query('ROLLBACK');
+            console.error(`[auto-reject] Error processing order ${order.id}: ${err.message}`);
+          }
+        }
+
+        console.log(`[auto-reject] Done. Rejected: ${rejectedCount} | Notifications sent: ${notifiedCount} | Skipped (anti-spam): ${skippedSpam}`);
+
+      } finally {
+        client.release();
+        if (connection) await connection.close();
+        await pool.end();
+      }
+    }
+
+    run().catch(err => {
+      console.error('[auto-reject] Fatal error:', err.message);
+      process.exit(1);
+    });
