@@ -1,0 +1,10 @@
+# ============================================================
+# ELK Stack – Namespace separado para observabilidad
+# ============================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: logging
+  labels:
+    app: elk
+    project: delivereats-observability

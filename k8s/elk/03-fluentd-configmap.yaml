@@ -1,0 +1,103 @@
+# ============================================================
+# Fluentd ConfigMap – Captura logs JSON de todos los pods
+# Crea índices separados por microservicio en Elasticsearch
+# ============================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentd-config
+  namespace: logging
+  labels:
+    app: fluentd
+data:
+  fluent.conf: |
+    # ─────────────────────────────────────────────────────────
+    # INPUT: Tail de logs de contenedores en /var/log/containers
+    # ─────────────────────────────────────────────────────────
+    <source>
+      @type tail
+      path /var/log/containers/*.log
+      pos_file /var/log/fluentd-containers.log.pos
+      tag kubernetes.*
+      read_from_head true
+      <parse>
+        @type multi_format
+        <pattern>
+          format json
+          time_key time
+          time_format %Y-%m-%dT%H:%M:%S.%NZ
+        </pattern>
+        <pattern>
+          format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
+          time_format %Y-%m-%dT%H:%M:%S.%N%:z
+        </pattern>
+      </parse>
+    </source>
+
+    # ─────────────────────────────────────────────────────────
+    # FILTRO: Enriquecer con metadatos de Kubernetes
+    # ─────────────────────────────────────────────────────────
+    <filter kubernetes.**>
+      @type kubernetes_metadata
+      @id filter_kube_meta
+    </filter>
+
+    # ─────────────────────────────────────────────────────────
+    # FILTRO: Parsear log interno como JSON si es posible
+    # ─────────────────────────────────────────────────────────
+    <filter kubernetes.**>
+      @type parser
+      key_name log
+      reserve_data true
+      remove_key_name_field false
+      <parse>
+        @type multi_format
+        <pattern>
+          format json
+        </pattern>
+        <pattern>
+          format none
+        </pattern>
+      </parse>
+    </filter>
+
+    # ─────────────────────────────────────────────────────────
+    # FILTRO: Solo logs del namespace delivereats
+    # ─────────────────────────────────────────────────────────
+    <filter kubernetes.**>
+      @type grep
+      <regexp>
+        key $.kubernetes.namespace_name
+        pattern ^(delivereats|logging)$
+      </regexp>
+    </filter>
+
+    # ─────────────────────────────────────────────────────────
+    # OUTPUT: Elasticsearch – índice por microservicio
+    # ─────────────────────────────────────────────────────────
+    <match kubernetes.**>
+      @type elasticsearch
+      @id out_es
+      host elasticsearch
+      port 9200
+      scheme http
+      logstash_format true
+      logstash_prefix delivereats-${$.kubernetes.labels.app}
+      logstash_dateformat %Y.%m.%d
+      include_tag_key true
+      tag_key @log_name
+      flush_interval 5s
+      <buffer>
+        @type file
+        path /var/log/fluentd-buffers/kubernetes.system.buffer
+        flush_mode interval
+        retry_type exponential_backoff
+        flush_thread_count 2
+        flush_interval 5s
+        retry_forever false
+        retry_max_interval 30
+        chunk_limit_size 2M
+        total_limit_size 500M
+        overflow_action block
+      </buffer>
+    </match>
