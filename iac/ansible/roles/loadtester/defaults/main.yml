@@ -1,5 +1,5 @@
 ---
-locust_version: "2.24.0"
-app_user: ubuntu
-locust_dir: /home/ubuntu/loadtest
-locust_host: "http://localhost"
+loadtester_locust_version: "2.24.0"
+loadtester_app_user: ubuntu
+loadtester_locust_dir: /home/ubuntu/loadtest
+loadtester_locust_host: "http://localhost"

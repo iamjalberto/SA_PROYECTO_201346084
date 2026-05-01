@@ -21,10 +21,10 @@
 # ─────────────────────────────────────────────
 - name: Create loadtest directory
   ansible.builtin.file:
-    path: "{{ locust_dir }}"
+    path: "{{ loadtester_locust_dir }}"
     state: directory
-    owner: "{{ app_user }}"
-    group: "{{ app_user }}"
+    owner: "{{ loadtester_app_user }}"
+    group: "{{ loadtester_app_user }}"
     mode: "0755"
 
 # ─────────────────────────────────────────────
@@ -32,9 +32,10 @@
 # ─────────────────────────────────────────────
 - name: Create Python virtual environment
   ansible.builtin.command:
-    cmd: python3 -m venv {{ locust_dir }}/venv
-    creates: "{{ locust_dir }}/venv/bin/activate"
-  become_user: "{{ app_user }}"
+    cmd: python3 -m venv {{ loadtester_locust_dir }}/venv
+    creates: "{{ loadtester_locust_dir }}/venv/bin/activate"
+  become: true
+  become_user: "{{ loadtester_app_user }}"
 
 # ─────────────────────────────────────────────
 # Tarea 4: Instalar Locust en el venv
@@ -42,19 +43,20 @@
 - name: Install Locust via pip
   ansible.builtin.pip:
     name:
-      - "locust=={{ locust_version }}"
+      - "locust=={{ loadtester_locust_version }}"
       - requests
       - faker
-    virtualenv: "{{ locust_dir }}/venv"
+    virtualenv: "{{ loadtester_locust_dir }}/venv"
     state: present
-  become_user: "{{ app_user }}"
+  become: true
+  become_user: "{{ loadtester_app_user }}"
 
 # ─────────────────────────────────────────────
 # Tarea 5: Crear symlink global de locust
 # ─────────────────────────────────────────────
 - name: Create global locust symlink
   ansible.builtin.file:
-    src: "{{ locust_dir }}/venv/bin/locust"
+    src: "{{ loadtester_locust_dir }}/venv/bin/locust"
     dest: /usr/local/bin/locust
     state: link
     force: true
@@ -65,9 +67,9 @@
 - name: Copy locustfile to VM
   ansible.builtin.copy:
     src: ../../../tests/locustfile.py
-    dest: "{{ locust_dir }}/locustfile.py"
-    owner: "{{ app_user }}"
-    group: "{{ app_user }}"
+    dest: "{{ loadtester_locust_dir }}/locustfile.py"
+    owner: "{{ loadtester_app_user }}"
+    group: "{{ loadtester_app_user }}"
     mode: "0644"
 
 # ─────────────────────────────────────────────
@@ -76,9 +78,9 @@
 - name: Copy smoke test script
   ansible.builtin.copy:
     src: ../../../tests/smoke-test.sh
-    dest: "{{ locust_dir }}/smoke-test.sh"
-    owner: "{{ app_user }}"
-    group: "{{ app_user }}"
+    dest: "{{ loadtester_locust_dir }}/smoke-test.sh"
+    owner: "{{ loadtester_app_user }}"
+    group: "{{ loadtester_app_user }}"
     mode: "0755"
 
 # ─────────────────────────────────────────────
@@ -87,7 +89,7 @@
 - name: Template locust run script
   ansible.builtin.template:
     src: run-locust.sh.j2
-    dest: "{{ locust_dir }}/run-locust.sh"
-    owner: "{{ app_user }}"
-    group: "{{ app_user }}"
+    dest: "{{ loadtester_locust_dir }}/run-locust.sh"
+    owner: "{{ loadtester_app_user }}"
+    group: "{{ loadtester_app_user }}"
     mode: "0755"

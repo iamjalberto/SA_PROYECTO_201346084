@@ -5,11 +5,11 @@
 # ============================================================
 set -euo pipefail
 
-HOST="${LOCUST_HOST:-{{ locust_host }}}"
+HOST="${LOCUST_HOST:-{{ loadtester_locust_host }}}"
 USERS="${LOCUST_USERS:-20}"
 SPAWN_RATE="${LOCUST_SPAWN_RATE:-5}"
 RUN_TIME="${LOCUST_RUN_TIME:-2m}"
-REPORT_DIR="{{ locust_dir }}/reports"
+REPORT_DIR="{{ loadtester_locust_dir }}/reports"
 
 mkdir -p "$REPORT_DIR"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
@@ -17,7 +17,7 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 echo "Starting Locust load test against $HOST"
 echo "Users: $USERS | Spawn rate: $SPAWN_RATE | Duration: $RUN_TIME"
 
-{{ locust_dir }}/venv/bin/locust \
+{{ loadtester_locust_dir }}/venv/bin/locust \
   --headless \
   --host="$HOST" \
   --users="$USERS" \
@@ -25,6 +25,6 @@ echo "Users: $USERS | Spawn rate: $SPAWN_RATE | Duration: $RUN_TIME"
   --run-time="$RUN_TIME" \
   --csv="$REPORT_DIR/locust_${TIMESTAMP}" \
   --html="$REPORT_DIR/locust_report_${TIMESTAMP}.html" \
-  -f {{ locust_dir }}/locustfile.py
+  -f {{ loadtester_locust_dir }}/locustfile.py
 
 echo "Report saved at $REPORT_DIR/locust_report_${TIMESTAMP}.html"

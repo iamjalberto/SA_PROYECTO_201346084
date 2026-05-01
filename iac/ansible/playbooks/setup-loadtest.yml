@@ -9,9 +9,9 @@
   gather_facts: true
 
   vars:
-    locust_version: "2.24.0"
-    app_user: ubuntu
-    locust_dir: /home/ubuntu/loadtest
+    loadtester_locust_version: "2.24.0"
+    loadtester_app_user: ubuntu
+    loadtester_locust_dir: /home/ubuntu/loadtest
 
   pre_tasks:
     - name: Update apt cache
