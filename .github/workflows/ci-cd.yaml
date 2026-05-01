@@ -277,10 +277,17 @@ jobs:
           # Ingress
           kubectl apply -f k8s/ingress.yaml
 
-          # Esperar rollout de servicios críticos
+          # Esperar rollout de servicios críticos (en paralelo, timeout 600s cada uno)
+          PIDS=()
           for svc in auth-service restaurant-catalog-service order-service api-gateway frontend; do
-            kubectl rollout status deployment/${svc} -n delivereats --timeout=300s
+            kubectl rollout status deployment/${svc} -n delivereats --timeout=600s &
+            PIDS+=($!)
           done
+          FAILED=0
+          for pid in "${PIDS[@]}"; do
+            wait "$pid" || FAILED=1
+          done
+          [ $FAILED -eq 0 ]
 
       - name: Deploy observability stack (ELK)
         run: |
