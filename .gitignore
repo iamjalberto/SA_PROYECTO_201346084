@@ -14,3 +14,4 @@ package-lock.json
 # Guías de calificación – NO subir al repo remoto
 GUIA_CALIFICACION*.md
 GUIA_CALIFICACION*.html
+CHECKLIST_ENTREGA_FASE3.md

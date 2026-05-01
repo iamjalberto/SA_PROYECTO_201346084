@@ -419,5 +419,95 @@ SA_PROYECTO_201346084/
 │   └── smoke-test.sh
 └── docs/
     ├── DOCUMENTACION_FASE3.md
-    └── MANUAL_OBSERVABILIDAD.md
+    ├── MANUAL_OBSERVABILIDAD.md
+    ├── GESTION_AGIL_FASE3.md
+    ├── locust-report.html
+    ├── presentacion-fase3.html
+    └── dashboards/
+        ├── grafana-delivereats-overview.json
+        └── kibana-delivereats-dashboard.ndjson
 ```
+
+---
+
+## 9. Casos de Uso Actualizados – Fase 3
+
+La Fase 3 no introduce nuevos actores de negocio pero incorpora dos flujos nuevos: la **tarea automática de rechazo de órdenes** (CronJob) y las **operaciones de observabilidad** (consultadas por el operador SRE).
+
+### Nuevos Casos de Uso
+
+#### CU-F3-01: Rechazar Órdenes Abandonadas (CronJob)
+| Campo | Descripción |
+|---|---|
+| **Actor** | Sistema (CronJob Kubernetes, ejecuta cada 5 min) |
+| **Precondición** | Existen órdenes en estado `CREADA` con `created_at < NOW() - 60 min` |
+| **Flujo principal** | 1. CronJob consulta DB por órdenes expiradas. 2. Para cada orden: verifica `order_notifications` (anti-spam). 3. Actualiza estado a `RECHAZADA`. 4. Publica evento `order.rejected` en RabbitMQ. 5. `notification-service` envía email al cliente. 6. Registra entrada en `order_notifications`. |
+| **Excepción** | Si la orden ya tiene notificación de tipo `RECHAZO`, se omite (anti-spam). |
+| **Postcondición** | Orden en estado `RECHAZADA`. Cliente notificado exactamente una vez. |
+
+#### CU-F3-02: Consultar Métricas de Observabilidad (SRE)
+| Campo | Descripción |
+|---|---|
+| **Actor** | Operador SRE |
+| **Precondición** | Stack de monitoreo desplegado (Prometheus + Grafana). |
+| **Flujo principal** | 1. SRE accede a Grafana (`/grafana`). 2. Selecciona dashboard "Delivereats Overview". 3. Visualiza uptime por servicio, request rate, latencia P95, error rate. 4. Si se dispara una alerta, revisa detalle en Alertmanager. |
+| **Postcondición** | SRE puede tomar acción sobre el microservicio degradado. |
+
+#### CU-F3-03: Consultar Logs Centralizados (SRE)
+| Campo | Descripción |
+|---|---|
+| **Actor** | Operador SRE |
+| **Precondición** | Stack ELK desplegado. Fluentd recolectando logs. |
+| **Flujo principal** | 1. SRE accede a Kibana (`/kibana`). 2. Busca en índice `delivereats-*` por `level: error`. 3. Filtra por servicio y rango de tiempo. 4. Exporta logs relevantes para post-mortem. |
+| **Postcondición** | Logs de error aislados y exportados. |
+
+---
+
+## 10. Diagrama Entidad–Relación Actualizado – Fase 3
+
+La Fase 3 agrega una tabla al esquema existente de Fase 2: `order_notifications`, necesaria para el mecanismo anti-spam del CronJob.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  NOVEDADES FASE 3 (resaltadas con **)                               │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────┐          ┌────────────────────────────────────┐
+│     orders       │          │  ** order_notifications **         │
+├──────────────────┤  1 ─── N ├────────────────────────────────────┤
+│ id         (PK)  │──────────│ id          (PK)                   │
+│ customer_id      │          │ order_id    (FK → orders.id)       │
+│ customer_email   │          │ type        VARCHAR(20)            │
+│ restaurant_id    │          │             ('RECHAZO','CONFIRMADO')│
+│ status           │          │ sent_at     TIMESTAMP              │
+│   CREADA         │          │ channel     VARCHAR(10) ('EMAIL')  │
+│   ACEPTADA       │          └────────────────────────────────────┘
+│   RECHAZADA      │
+│   ENTREGADA      │
+│ created_at       │          Propósito: registra qué notificaciones
+│ updated_at       │          ya fueron enviadas para evitar spam   
+└──────────────────┘          (verificada antes de cada envío).    
+
+ TABLAS HEREDADAS DE FASE 2 (sin cambios estructurales):
+ ┌───────────┐  ┌────────────┐  ┌──────────────┐  ┌──────────┐
+ │  users    │  │restaurants │  │ order_items  │  │ payments │
+ └───────────┘  └────────────┘  └──────────────┘  └──────────┘
+```
+
+### DDL de la tabla nueva
+
+```sql
+-- Tabla anti-spam para CronJob de rechazo de órdenes
+CREATE TABLE IF NOT EXISTS order_notifications (
+  id         SERIAL PRIMARY KEY,
+  order_id   INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  type       VARCHAR(20) NOT NULL CHECK (type IN ('RECHAZO', 'CONFIRMADO', 'ENTREGADO')),
+  sent_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+  channel    VARCHAR(10) NOT NULL DEFAULT 'EMAIL',
+  UNIQUE (order_id, type)   -- Garantía anti-spam a nivel de BD
+);
+
+CREATE INDEX idx_order_notif_order_id ON order_notifications(order_id);
+```
+
+> **Nota de consistencia**: la restricción `UNIQUE (order_id, type)` a nivel de base de datos actúa como segunda capa de anti-spam, complementando la verificación en código del CronJob.

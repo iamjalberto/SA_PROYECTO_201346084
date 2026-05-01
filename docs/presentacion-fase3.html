@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delivereats – Fase 3 | Presentación Técnica</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
+  <style>
+    :root {
+      --accent: #f97316;
+      --accent2: #3b82f6;
+      --ok: #22c55e;
+    }
+    .reveal { font-family: 'Segoe UI', Arial, sans-serif; }
+    .reveal h1, .reveal h2, .reveal h3 { color: var(--accent); text-transform: none; }
+    .reveal h1 { font-size: 1.8em; }
+    .reveal h2 { font-size: 1.3em; border-bottom: 2px solid var(--accent); padding-bottom: .2em; }
+    .reveal section { text-align: left; }
+    .reveal .center { text-align: center; }
+    .pill {
+      display: inline-block; padding: 2px 10px; border-radius: 99px;
+      font-size: .65em; font-weight: 700; margin: 2px;
+    }
+    .pill-orange { background: var(--accent); color: #000; }
+    .pill-blue   { background: var(--accent2); color: #fff; }
+    .pill-green  { background: var(--ok); color: #000; }
+    .reveal table { font-size: .65em; width: 100%; border-collapse: collapse; }
+    .reveal table th { background: #1e293b; color: var(--accent); padding: 6px 10px; }
+    .reveal table td { padding: 5px 10px; border-bottom: 1px solid #334155; }
+    .reveal table tr:nth-child(even) td { background: #0f172a; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; }
+    .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .8em; }
+    .card {
+      background: #1e293b; border-radius: 8px; padding: .8em 1em;
+      border-left: 4px solid var(--accent); font-size: .7em;
+    }
+    .card.blue  { border-color: var(--accent2); }
+    .card.green { border-color: var(--ok); }
+    .card h4 { margin: 0 0 .4em; color: var(--accent); font-size: 1em; }
+    .card.blue h4  { color: var(--accent2); }
+    .card.green h4 { color: var(--ok); }
+    .reveal pre { font-size: .48em; }
+    .reveal ul { margin-left: 1em; }
+    .reveal li { margin: .3em 0; }
+    .badge { display: inline-block; background:#334155; border-radius:4px; padding:2px 8px; font-family:monospace; font-size:.7em; }
+    .warn { color: #fbbf24; }
+    .ok   { color: var(--ok); }
+    .no   { color: #ef4444; }
+    footer-note { font-size:.5em; color:#64748b; position:absolute; bottom:0; }
+    .progress-bar { height: 6px; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 3px; margin: .5em 0; }
+    .sprint-row { display:flex; gap:.5em; margin:.3em 0; font-size:.65em; }
+    .sprint-label { width:70px; color:#94a3b8; }
+    .sprint-bar { flex:1; background:#1e293b; border-radius:4px; overflow:hidden; }
+    .sprint-fill { height:16px; background:linear-gradient(90deg,var(--ok),var(--accent2)); border-radius:4px; display:flex; align-items:center; padding-left:6px; font-size:.85em; font-weight:700; color:#000; }
+    .reveal .slides section .fragment { opacity: 1; }
+  </style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ─── PORTADA ─── -->
+<section class="center" data-background-gradient="linear-gradient(135deg,#0f172a 0%,#1e293b 100%)">
+  <h1 style="font-size:2em;">Delivereats</h1>
+  <h2 style="border:none;color:#94a3b8;font-size:1em;font-weight:300;">Fase 3 – DevOps, IaC &amp; Observabilidad</h2>
+  <div style="margin-top:1.5em;font-size:.7em;color:#64748b;">
+    Sistemas de Alto Rendimiento · USAC · Ingeniería en Sistemas<br>
+    <strong style="color:#e2e8f0;">José Alberto Alarcón Chigua · 201346084</strong><br>
+    <span style="color:var(--accent);">Abril 2026</span>
+  </div>
+</section>
+
+<!-- ─── AGENDA ─── -->
+<section data-background="#0f172a">
+  <h2>Agenda</h2>
+  <div class="two-col" style="font-size:.75em;">
+    <ul>
+      <li>Evolución de la Arquitectura</li>
+      <li>IaC con Terraform</li>
+      <li>Automatización con Ansible</li>
+      <li>CronJobs de Negocio</li>
+    </ul>
+    <ul>
+      <li>Stack ELK – Logs Centralizados</li>
+      <li>Prometheus + Grafana</li>
+      <li>Pruebas de Carga (Locust)</li>
+      <li>CI/CD Actualizado</li>
+    </ul>
+  </div>
+  <div style="margin-top:1.2em;text-align:center;">
+    <span class="badge">20 minutos</span>
+  </div>
+</section>
+
+<!-- ─── EVOLUCIÓN ARQUITECTURA ─── -->
+<section>
+  <section data-background="#0f172a">
+    <h2>Evolución de la Arquitectura</h2>
+    <div class="two-col">
+      <div class="card">
+        <h4>Fase 1 &amp; 2</h4>
+        <ul>
+          <li>Microservicios Node.js + Python</li>
+          <li>Docker Compose → K8s (k3s)</li>
+          <li>VM GCP manual</li>
+          <li>PostgreSQL en contenedor</li>
+          <li>6 servicios + API Gateway</li>
+        </ul>
+      </div>
+      <div class="card blue">
+        <h4>Fase 3 (ahora)</h4>
+        <ul>
+          <li>Infra 100% automatizada (Terraform)</li>
+          <li>GKE managed + Cloud SQL external</li>
+          <li>Cloud Run para frontend</li>
+          <li>Observabilidad completa (ELK + Prometheus)</li>
+          <li>Load testing automatizado</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+  <section data-background="#0f172a">
+    <h2>Diagrama de Arquitectura – Fase 3</h2>
+    <pre style="font-size:.42em;"><code class="text">
+  ┌──────────── GCP ─────────────────────────────────────────────┐
+  │                                                               │
+  │  VPC: delivereats-vpc (10.0.0.0/20)                          │
+  │  ┌───── GKE Cluster ────────────────────────────────────────┐│
+  │  │  NS: delivereats  → microservicios + RabbitMQ + Redis    ││
+  │  │  NS: logging      → Elasticsearch + Kibana + Fluentd     ││
+  │  │  NS: monitoring   → Prometheus + Grafana + NodeExporter  ││
+  │  └──────────────────────────────────────────────────────────┘│
+  │                                                               │
+  │  Cloud SQL (MSSQL 2019) ←── VPC Peering ──── GKE            │
+  │  Compute Engine VM ─── Locust load testing                   │
+  │  Cloud Run ─── Frontend (serverless)                         │
+  └───────────────────────────────────────────────────────────────┘
+    </code></pre>
+    <div style="text-align:center;margin-top:.5em;">
+      <span class="pill pill-green">✓ BD fuera del cluster</span>
+      <span class="pill pill-green">✓ 100% automatizado</span>
+      <span class="pill pill-orange">Sin penalizaciones</span>
+    </div>
+  </section>
+</section>
+
+<!-- ─── TERRAFORM ─── -->
+<section>
+  <section data-background="#0f172a">
+    <h2>Infraestructura como Código – Terraform</h2>
+    <div class="three-col">
+      <div class="card">
+        <h4>vpc</h4>
+        VPC + subred<br>Secondary ranges<br>4 reglas firewall
+      </div>
+      <div class="card">
+        <h4>gke</h4>
+        Cluster privado<br>Node pool autoscaling<br>1–5 nodos e2-std-4
+      </div>
+      <div class="card">
+        <h4>database</h4>
+        Cloud SQL<br>MSSQL 2019 Std<br>VPC Peering privado
+      </div>
+      <div class="card blue">
+        <h4>cloud_run</h4>
+        Frontend<br>Serverless<br>IAM público
+      </div>
+      <div class="card blue">
+        <h4>compute</h4>
+        VM e2-medium<br>Ubuntu 22.04<br>Load Testing
+      </div>
+      <div class="card green">
+        <h4>backend</h4>
+        Estado remoto<br>GCS bucket<br>Colaborativo
+      </div>
+    </div>
+  </section>
+  <section data-background="#0f172a">
+    <h2>Terraform – Validación en CI/CD</h2>
+    <pre><code class="yaml">terraform-validate:
+  steps:
+    - terraform fmt -check -recursive   # [1] estilo
+    - terraform init -backend=false     # [2] módulos
+    - terraform validate                # [3] sintaxis HCL
+    - terraform plan -out=tfplan        # [4] plan sin apply
+    → artifact: tfplan (7 días)</code></pre>
+    <p style="font-size:.7em;color:#94a3b8;">Bloquea <code>build-and-push</code> y <code>deploy</code> si falla.</p>
+  </section>
+</section>
+
+<!-- ─── ANSIBLE ─── -->
+<section data-background="#0f172a">
+  <h2>Gestión de Configuración – Ansible</h2>
+  <div class="two-col">
+    <div>
+      <p style="font-size:.7em;color:#94a3b8;">Role <code>loadtester</code> – 8 tareas idempotentes:</p>
+      <ol style="font-size:.65em;">
+        <li>apt update + dependencias del sistema</li>
+        <li>Instalar python3-venv</li>
+        <li>Crear directorio <code>/opt/delivereats-loadtest</code></li>
+        <li>Crear virtualenv Python</li>
+        <li>Instalar <strong>Locust 2.24</strong> en venv</li>
+        <li>Copiar <code>locustfile.py</code></li>
+        <li>Copiar <code>smoke-test.sh</code></li>
+        <li>Template <code>run-locust.sh</code> (Jinja2)</li>
+      </ol>
+    </div>
+    <pre style="font-size:.45em;"><code class="bash"># Un solo comando configura la VM
+ansible-playbook \
+  -i inventory/hosts.ini \
+  playbooks/setup-loadtest.yml
+
+# Idempotente: re-ejecutar no rompe nada
+# Locust listo en /usr/local/bin/locust</code></pre>
+  </div>
+</section>
+
+<!-- ─── CRONJOBS ─── -->
+<section data-background="#0f172a">
+  <h2>CronJob – Rechazo Automático de Órdenes</h2>
+  <div class="two-col">
+    <div style="font-size:.7em;">
+      <p><strong>Problema:</strong> Órdenes en estado <code>CREADA</code> abandonadas bloquean la vista del restaurante.</p>
+      <br>
+      <p><strong>Solución:</strong> CronJob cada 5 minutos.</p>
+      <ul>
+        <li>Busca órdenes <code>CREADA &gt; 60 min</code></li>
+        <li>Cambia estado → <code>RECHAZADA</code></li>
+        <li>Notifica via RabbitMQ <code>order.rejected</code></li>
+        <li><strong>Anti-spam:</strong> tabla <code>order_notifications</code></li>
+        <li>Log: <code>Rechazadas/Notificadas/Omitidas</code></li>
+      </ul>
+    </div>
+    <pre style="font-size:.42em;"><code class="yaml">spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  activeDeadlineSeconds: 240
+  successfulJobsLimit: 3
+  failedJobsLimit: 1
+
+# Output ejemplo:
+# [OK]  Rechazadas: 3
+# [MSG] Notificadas: 3
+# [IGN] Omitidas (anti-spam): 0</code></pre>
+  </div>
+</section>
+
+<!-- ─── ELK ─── -->
+<section>
+  <section data-background="#0f172a">
+    <h2>Stack ELK – Logs Centralizados</h2>
+    <div class="three-col">
+      <div class="card">
+        <h4>Elasticsearch</h4>
+        v8.12.2<br>StatefulSet<br>10Gi PVC<br>Índices por servicio
+      </div>
+      <div class="card blue">
+        <h4>Fluentd</h4>
+        DaemonSet<br>Lee <code>/var/log/containers</code><br>Enruta por label <code>app</code>
+      </div>
+      <div class="card green">
+        <h4>Kibana</h4>
+        v8.12.2<br>Dashboard importado<br>KQL filtering
+      </div>
+    </div>
+    <div style="margin-top:1em;font-size:.65em;text-align:center;">
+      <code>delivereats-auth-service.*</code> &nbsp;|&nbsp;
+      <code>delivereats-order-service.*</code> &nbsp;|&nbsp;
+      <code>delivereats-api-gateway.*</code> &nbsp;…
+    </div>
+  </section>
+  <section data-background="#0f172a">
+    <h2>Kibana – Demo en Vivo</h2>
+    <div style="font-size:.72em;">
+      <p style="color:#94a3b8;">Flujo a demostrar:</p>
+      <ol>
+        <li>Abrir Kibana → <strong>Discover</strong></li>
+        <li>Data view: <code>delivereats-*</code></li>
+        <li>Filtrar: <code>kubernetes.labels.app: "order-service"</code></li>
+        <li>Mostrar dashboard <strong>"Delivereats – Observabilidad de Logs"</strong>:<br>
+          <ul>
+            <li>Error rate por microservicio (histograma)</li>
+            <li>Distribución de logs (pie chart)</li>
+            <li>Ejecuciones del CronJob (cada 5 min)</li>
+          </ul>
+        </li>
+        <li>Simular error: llamar endpoint inválido → ver en Kibana en ~5s</li>
+      </ol>
+    </div>
+  </section>
+</section>
+
+<!-- ─── PROMETHEUS + GRAFANA ─── -->
+<section>
+  <section data-background="#0f172a">
+    <h2>Prometheus + Grafana</h2>
+    <div class="two-col">
+      <div>
+        <p style="font-size:.65em;color:#94a3b8;">Scrape targets activos:</p>
+        <table>
+          <tr><th>Target</th><th>Qué mide</th></tr>
+          <tr><td>kubernetes-apiservers</td><td>API server</td></tr>
+          <tr><td>kubernetes-nodes</td><td>kubelet</td></tr>
+          <tr><td>node-exporter</td><td>CPU/RAM/disco</td></tr>
+          <tr><td>delivereats-pods</td><td>métricas app</td></tr>
+          <tr><td>rabbitmq</td><td>colas/mensajes</td></tr>
+        </table>
+      </div>
+      <div>
+        <p style="font-size:.65em;color:#94a3b8;">Alertas configuradas:</p>
+        <table>
+          <tr><th>Alerta</th><th>Severidad</th></tr>
+          <tr><td>ServiceDown</td><td class="no">critical</td></tr>
+          <tr><td>HighLatency (p95 &gt;2s)</td><td class="warn">warning</td></tr>
+          <tr><td>HighErrorRate (5xx &gt;10%)</td><td class="warn">warning</td></tr>
+          <tr><td>PodCrashLooping</td><td class="warn">warning</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+  <section data-background="#0f172a">
+    <h2>Grafana – Demo en Vivo</h2>
+    <div style="font-size:.72em;">
+      <p style="color:#94a3b8;">Flujo a demostrar:</p>
+      <ol>
+        <li>Abrir Grafana → importar <code>grafana-delivereats-overview.json</code></li>
+        <li>Mostrar panel <strong>"HTTP Request Rate por Servicio"</strong></li>
+        <li>Mostrar panel <strong>"Latencia P95"</strong> — thresholds en amarillo/rojo</li>
+        <li>Mostrar panel <strong>"Error Rate %"</strong> — gauge con colores</li>
+        <li>Mostrar panel <strong>"CPU/Memoria por Nodo"</strong></li>
+        <li>En Status → <strong>Alerts</strong>: mostrar reglas cargadas</li>
+      </ol>
+    </div>
+  </section>
+</section>
+
+<!-- ─── LOCUST ─── -->
+<section data-background="#0f172a">
+  <h2>Pruebas de Carga – Locust 2.24</h2>
+  <div class="two-col">
+    <div>
+      <table>
+        <tr><th>User Class</th><th>Peso</th><th>Comportamiento</th></tr>
+        <tr><td>GuestUser</td><td>30%</td><td>Browse: health, restaurantes</td></tr>
+        <tr><td>RegisteredUser</td><td>70%</td><td>Auth → órdenes → wallet → FX</td></tr>
+      </table>
+      <div style="margin-top:.8em;font-size:.65em;">
+        <span class="badge">20 usuarios concurrentes</span>
+        <span class="badge">5 usuarios/seg spawn</span>
+        <span class="badge">2 minutos</span>
+      </div>
+    </div>
+    <pre style="font-size:.42em;"><code class="bash"># Ejecutar desde VM de load-testing
+locust -f locustfile.py \
+  --host http://API_GW_URL \
+  --headless \
+  --users 20 \
+  --spawn-rate 5 \
+  --run-time 2m \
+  --html reporte-$(date +%Y%m%d).html
+
+# → reporte con gráficas generado al finalizar</code></pre>
+  </div>
+</section>
+
+<!-- ─── CI/CD ─── -->
+<section data-background="#0f172a">
+  <h2>Pipeline CI/CD – Fase 3</h2>
+  <pre style="font-size:.5em;"><code class="text">terraform-validate ──┐
+                      │
+ansible-lint ─────────┼──> build-and-push ──> deploy
+                      │
+test (Node.js) ───────┤
+                      │
+test-python ──────────┘
+
+terraform-validate:
+  terraform fmt -check   →  terraform init   →  terraform validate  →  terraform plan
+  
+ansible-lint:
+  pip install ansible-lint 24.2.0  →  lint playbooks/setup-loadtest.yml</code></pre>
+  <p style="font-size:.65em;color:#94a3b8;">Archivo: <code>.github/workflows/ci-cd.yaml</code> — ambos jobs son prerequisito de build y deploy.</p>
+</section>
+
+<!-- ─── SCRUM ─── -->
+<section data-background="#0f172a">
+  <h2>Metodología SCRUM</h2>
+
+  <div class="three-col" style="margin-bottom:1em;">
+    <div class="card">
+      <h4>Sprint 1</h4>
+      <div style="color:#94a3b8;margin-bottom:.4em;font-size:.85em;">19 – 28 mar 2026</div>
+      <ul style="font-size:.85em;margin:0;padding-left:1em;">
+        <li>Terraform: 5 módulos</li>
+        <li>Backend GCS</li>
+        <li>Ansible role (8 tareas)</li>
+      </ul>
+      <div style="margin-top:.6em;font-weight:700;color:var(--ok);">21 / 21 pts</div>
+    </div>
+    <div class="card blue">
+      <h4>Sprint 2</h4>
+      <div style="color:#94a3b8;margin-bottom:.4em;font-size:.85em;">29 mar – 10 abr 2026</div>
+      <ul style="font-size:.85em;margin:0;padding-left:1em;">
+        <li>CronJob + anti-spam</li>
+        <li>ELK Stack completo</li>
+        <li>Dashboard Kibana</li>
+      </ul>
+      <div style="margin-top:.6em;font-weight:700;color:var(--ok);">18 / 18 pts</div>
+    </div>
+    <div class="card green">
+      <h4>Sprint 3</h4>
+      <div style="color:#94a3b8;margin-bottom:.4em;font-size:.85em;">11 – 22 abr 2026</div>
+      <ul style="font-size:.85em;margin:0;padding-left:1em;">
+        <li>Prometheus + Grafana</li>
+        <li>Locust + Smoke tests</li>
+        <li>CI/CD + Documentación</li>
+      </ul>
+      <div style="margin-top:.6em;font-weight:700;color:var(--ok);">27 / 27 pts</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:1.5em;justify-content:center;font-size:.65em;flex-wrap:wrap;">
+    <span class="badge">Velocidad: 100%</span>
+    <span class="badge">66 / 66 puntos entregados</span>
+    <span class="badge">Tablero: github.com/users/iamjalberto/projects/3</span>
+  </div>
+</section>
+
+<!-- ─── CONCLUSIONES ─── -->
+<section data-background="#0f172a">
+  <h2>Conclusiones</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2em;margin-top:1em;font-size:.62em;">
+    <div class="sprint-card">
+      <div class="sprint-title">Infraestructura como Codigo</div>
+      <ul>
+        <li>Terraform elimina la configuracion manual y hace el entorno reproducible</li>
+        <li>Ansible orquesta la VM de load-testing sin intervención humana</li>
+        <li>Toda la IaC vive en el repo y pasa por CI antes de aplicarse</li>
+      </ul>
+    </div>
+    <div class="sprint-card">
+      <div class="sprint-title">Observabilidad</div>
+      <ul>
+        <li>ELK centraliza logs de todos los servicios en un solo índice</li>
+        <li>Prometheus + Grafana exponen métricas de latencia, errores y recursos</li>
+        <li>Las alertas permiten reaccionar antes de que el usuario lo note</li>
+      </ul>
+    </div>
+    <div class="sprint-card">
+      <div class="sprint-title">Automatizacion y Calidad</div>
+      <ul>
+        <li>El CronJob de rechazo protege la consistencia del negocio sin código nuevo</li>
+        <li>Locust demostró que el sistema soporta 20 usuarios concurrentes</li>
+        <li>Smoke tests en CI garantizan que cada merge no rompe los contratos</li>
+      </ul>
+    </div>
+    <div class="sprint-card">
+      <div class="sprint-title">Lecciones Aprendidas</div>
+      <ul>
+        <li>Separar plan de apply en CI evita cambios accidentales en producción</li>
+        <li>Sin logs estructurados, buscar un error toma horas; con ELK, segundos</li>
+        <li>SCRUM + DoD definido impidió entregar tareas "casi listas"</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ─── CIERRE ─── -->
+<section class="center" data-background-gradient="linear-gradient(135deg,#0f172a 0%,#1e293b 100%)">
+  <h1>¿Preguntas?</h1>
+  <div style="margin-top:1.5em;font-size:.65em;color:#64748b;">
+    <strong style="color:#e2e8f0;">José Alberto Alarcón Chigua</strong><br>
+    Carné: 201346084<br>
+    <span class="badge" style="margin-top:.5em;">github.com/iamjalberto/SA_PROYECTO_201346084</span>
+    &nbsp;
+    <span class="badge">tag: v3.0.0</span>
+  </div>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: 'c/t',
+    progress: true,
+    center: false,
+    transition: 'slide',
+    transitionSpeed: 'fast',
+    plugins: [ RevealHighlight, RevealNotes ],
+    keyboard: {
+      84: () => Reveal.toggleOverview()  // T → thumbnail view
+    }
+  });
+</script>
+</body>
+</html>
