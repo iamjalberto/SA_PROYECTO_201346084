@@ -163,22 +163,6 @@ router.post(
   },
 );
 
-// GET /api/payments/:orderId - Obtener estado del pago (CLIENTE, ADMINISTRADOR)
-router.get("/:orderId", authenticateToken, async (req, res) => {
-  try {
-    const response = await grpcCall(paymentClient, "GetPaymentStatus", {
-      order_id: parseInt(req.params.orderId),
-    });
-    res.json(response);
-  } catch (error) {
-    res
-      .status(500)
-      .json({ success: false, message: "Error al consultar pago" });
-  }
-});
-
-// ===================== CUPONES =====================
-
 // GET /api/payments/wallet - Obtener saldo de cartera (CLIENTE)
 router.get(
   "/wallet",
@@ -243,6 +227,23 @@ router.get(
     }
   },
 );
+
+// ===================== CUPONES =====================
+
+// GET /api/payments/:orderId - Obtener estado del pago (CLIENTE, ADMINISTRADOR)
+// NOTA: debe ir DESPUÉS de rutas estáticas (/wallet, /all, /refund, /coupons/*)
+router.get("/:orderId", authenticateToken, async (req, res) => {
+  try {
+    const response = await grpcCall(paymentClient, "GetPaymentStatus", {
+      order_id: parseInt(req.params.orderId),
+    });
+    res.json(response);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, message: "Error al consultar pago" });
+  }
+});
 
 // POST /api/payments/coupons - Crear cupón (ADMINISTRADOR)
 router.post(
