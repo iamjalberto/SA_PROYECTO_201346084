@@ -16,6 +16,14 @@ service RestaurantCatalogService {
   rpc UpdateMenuItem (UpdateMenuItemRequest) returns (MenuItemResponse);
   rpc DeleteMenuItem (DeleteMenuItemRequest) returns (GenericResponse);
   rpc ListMenuItems (ListMenuItemsRequest) returns (ListMenuItemsResponse);
+
+  // Promotions
+  rpc CreatePromotion (CreatePromotionRequest) returns (PromotionResponse);
+  rpc ListPromotions (ListPromotionsRequest) returns (ListPromotionsResponse);
+  rpc DeletePromotion (DeletePromotionRequest) returns (GenericResponse);
+
+  // Search & Filters
+  rpc SearchRestaurants (SearchRestaurantsRequest) returns (ListRestaurantsResponse);
 }
 
 message CreateRestaurantRequest {
@@ -120,4 +128,53 @@ message MenuItem {
 message GenericResponse {
   bool success = 1;
   string message = 2;
+}
+
+// Promotions
+message CreatePromotionRequest {
+  int32 restaurant_id = 1;
+  string title = 2;
+  string description = 3;
+  string discount_type = 4;
+  float discount_value = 5;
+  string starts_at = 6;
+  string ends_at = 7;
+}
+
+message DeletePromotionRequest {
+  int32 id = 1;
+}
+
+message ListPromotionsRequest {
+  int32 restaurant_id = 1;
+}
+
+message Promotion {
+  int32 id = 1;
+  int32 restaurant_id = 2;
+  string title = 3;
+  string description = 4;
+  string discount_type = 5;
+  float discount_value = 6;
+  string starts_at = 7;
+  string ends_at = 8;
+  bool active = 9;
+}
+
+message PromotionResponse {
+  bool success = 1;
+  string message = 2;
+  Promotion promotion = 3;
+}
+
+message ListPromotionsResponse {
+  repeated Promotion promotions = 1;
+}
+
+// Search
+message SearchRestaurantsRequest {
+  string query = 1;
+  string food_type = 2;
+  string filter = 3;
+  bool has_promotions = 4;
 }

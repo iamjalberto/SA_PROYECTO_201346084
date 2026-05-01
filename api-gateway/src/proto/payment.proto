@@ -12,6 +12,10 @@ service PaymentService {
   rpc ValidateCoupon(ValidateCouponRequest) returns (ValidateCouponResponse);
   rpc ListCoupons(ListCouponsRequest) returns (ListCouponsResponse);
   rpc DeleteCoupon(DeleteCouponRequest) returns (CouponResponse);
+  // Cartera Digital
+  rpc GetWalletBalance(GetWalletBalanceRequest) returns (WalletResponse);
+  rpc RechargeWallet(RechargeWalletRequest) returns (WalletResponse);
+  rpc GetWalletTransactions(GetWalletTransactionsRequest) returns (WalletTransactionsResponse);
 }
 
 enum PaymentType {
@@ -157,4 +161,41 @@ message CouponData {
   bool active = 10;
   string expires_at = 11;
   string created_at = 12;
+}
+
+// ===================== Cartera Digital =====================
+
+message GetWalletBalanceRequest {
+  int32 customer_id = 1;
+}
+
+message RechargeWalletRequest {
+  int32 customer_id = 1;
+  double amount = 2;
+  string description = 3;
+}
+
+message WalletResponse {
+  bool success = 1;
+  string message = 2;
+  int32 wallet_id = 3;
+  double balance = 4;
+}
+
+message GetWalletTransactionsRequest {
+  int32 customer_id = 1;
+}
+
+message WalletTransaction {
+  int32 id = 1;
+  string type = 2;
+  double amount = 3;
+  string description = 4;
+  string created_at = 5;
+}
+
+message WalletTransactionsResponse {
+  bool success = 1;
+  repeated WalletTransaction transactions = 2;
+  double balance = 3;
 }
