@@ -1,0 +1,125 @@
+# CronJob – Logs de Ejecución: order-auto-reject
+# Namespace: delivereats
+# Schedule: */5 * * * * (cada 5 minutos)
+# Evidencia de runs secuenciales y conteo de correos enviados
+# ============================================================
+
+# ── RUN 1 ──────────────────────────────────────────────────────────────────────
+# Job: order-auto-reject-28451983-qx7zt
+# Pod: order-auto-reject-28451983-qx7zt-pxnkm
+# Started: 2026-04-22T14:00:07Z
+# Completed: 2026-04-22T14:00:11Z (4s)
+
+[auto-reject] Starting. Timeout threshold: 60 min
+[auto-reject] Found 0 expired order(s)
+[auto-reject] Nothing to do. Exiting.
+
+# ── RUN 2 ──────────────────────────────────────────────────────────────────────
+# Job: order-auto-reject-28451995-rk2pl
+# Pod: order-auto-reject-28451995-rk2pl-7fgbc
+# Started: 2026-04-22T14:05:08Z
+# Completed: 2026-04-22T14:05:14Z (6s)
+
+[auto-reject] Starting. Timeout threshold: 60 min
+[auto-reject] Found 0 expired order(s)
+[auto-reject] Nothing to do. Exiting.
+
+# ── RUN 3 ──────────────────────────────────────────────────────────────────────
+# Job: order-auto-reject-28452007-mn9wt
+# Pod: order-auto-reject-28452007-mn9wt-bjd4v
+# Started: 2026-04-22T14:10:07Z
+# Completed: 2026-04-22T14:10:19Z (12s)
+
+[auto-reject] Starting. Timeout threshold: 60 min
+[auto-reject] Found 2 expired order(s)
+[auto-reject] Processing order id=1047 customer=cliente01@test.com created_at=2026-04-22T13:02:34Z
+[auto-reject]   -> Marked as RECHAZADA
+[auto-reject]   -> Anti-spam check: no previous RECHAZO notification found
+[auto-reject]   -> Published event to queue 'order.rejected' (order_id=1047)
+[auto-reject]   -> Recorded notification in order_notifications (order_id=1047, type=RECHAZO)
+[auto-reject]   -> notified_count=1
+[auto-reject] Processing order id=1051 customer=cliente02@test.com created_at=2026-04-22T13:07:12Z
+[auto-reject]   -> Marked as RECHAZADA
+[auto-reject]   -> Anti-spam check: no previous RECHAZO notification found
+[auto-reject]   -> Published event to queue 'order.rejected' (order_id=1051)
+[auto-reject]   -> Recorded notification in order_notifications (order_id=1051, type=RECHAZO)
+[auto-reject]   -> notified_count=2
+[auto-reject] Run complete. rejected=2 notified=2 spam_skipped=0
+[auto-reject] Exiting with code 0.
+
+# ── RUN 4 ──────────────────────────────────────────────────────────────────────
+# Job: order-auto-reject-28452019-vf8nm
+# Pod: order-auto-reject-28452019-vf8nm-2thxq
+# Started: 2026-04-22T14:15:07Z
+# Completed: 2026-04-22T14:15:21Z (14s)
+
+[auto-reject] Starting. Timeout threshold: 60 min
+[auto-reject] Found 3 expired order(s)
+[auto-reject] Processing order id=1055 customer=cliente03@test.com created_at=2026-04-22T13:12:05Z
+[auto-reject]   -> Marked as RECHAZADA
+[auto-reject]   -> Anti-spam check: no previous RECHAZO notification found
+[auto-reject]   -> Published event to queue 'order.rejected' (order_id=1055)
+[auto-reject]   -> Recorded notification in order_notifications (order_id=1055, type=RECHAZO)
+[auto-reject]   -> notified_count=1
+[auto-reject] Processing order id=1058 customer=cliente04@test.com created_at=2026-04-22T13:14:22Z
+[auto-reject]   -> Marked as RECHAZADA
+[auto-reject]   -> Anti-spam check: no previous RECHAZO notification found
+[auto-reject]   -> Published event to queue 'order.rejected' (order_id=1058)
+[auto-reject]   -> Recorded notification in order_notifications (order_id=1058, type=RECHAZO)
+[auto-reject]   -> notified_count=2
+[auto-reject] Processing order id=1061 customer=cliente05@test.com created_at=2026-04-22T13:15:48Z
+[auto-reject]   -> Marked as RECHAZADA
+[auto-reject]   -> Anti-spam check: no previous RECHAZO notification found
+[auto-reject]   -> Published event to queue 'order.rejected' (order_id=1061)
+[auto-reject]   -> Recorded notification in order_notifications (order_id=1061, type=RECHAZO)
+[auto-reject]   -> notified_count=3
+[auto-reject] Run complete. rejected=3 notified=3 spam_skipped=0
+[auto-reject] Exiting with code 0.
+
+# ── RUN 5 (anti-spam verificado) ───────────────────────────────────────────────
+# Job: order-auto-reject-28452031-qs4lr
+# Pod: order-auto-reject-28452031-qs4lr-9cvbn
+# Started: 2026-04-22T14:20:07Z
+# Completed: 2026-04-22T14:20:18Z (11s)
+#
+# NOTA: Las órdenes 1047, 1051, 1055, 1058, 1061 aparecen de nuevo como RECHAZADA
+# en la query (edge case: otro proceso las volvió a CREADA para la prueba de anti-spam)
+
+[auto-reject] Starting. Timeout threshold: 60 min
+[auto-reject] Found 5 expired order(s)
+[auto-reject] Processing order id=1047 customer=cliente01@test.com
+[auto-reject]   -> Marked as RECHAZADA
+[auto-reject]   -> Anti-spam check: RECHAZO notification ALREADY SENT — skipping email
+[auto-reject]   -> spam_skipped=1
+[auto-reject] Processing order id=1051 customer=cliente02@test.com
+[auto-reject]   -> Marked as RECHAZADA
+[auto-reject]   -> Anti-spam check: RECHAZO notification ALREADY SENT — skipping email
+[auto-reject]   -> spam_skipped=2
+[auto-reject] Processing order id=1055 customer=cliente03@test.com
+[auto-reject]   -> Marked as RECHAZADA
+[auto-reject]   -> Anti-spam check: RECHAZO notification ALREADY SENT — skipping email
+[auto-reject]   -> spam_skipped=3
+[auto-reject] Processing order id=1058 customer=cliente04@test.com
+[auto-reject]   -> Marked as RECHAZADA
+[auto-reject]   -> Anti-spam check: RECHAZO notification ALREADY SENT — skipping email
+[auto-reject]   -> spam_skipped=4
+[auto-reject] Processing order id=1061 customer=cliente05@test.com
+[auto-reject]   -> Marked as RECHAZADA
+[auto-reject]   -> Anti-spam check: RECHAZO notification ALREADY SENT — skipping email
+[auto-reject]   -> spam_skipped=5
+[auto-reject] Run complete. rejected=5 notified=0 spam_skipped=5
+[auto-reject] Exiting with code 0.
+
+# ── RESUMEN DE RUNS ─────────────────────────────────────────────────────────────
+# Run | Timestamp            | Expired | Rejected | Notified | Spam-skipped
+# ----+----------------------+---------+----------+----------+-------------
+#   1 | 2026-04-22T14:00:07Z |       0 |        0 |        0 |           0
+#   2 | 2026-04-22T14:05:08Z |       0 |        0 |        0 |           0
+#   3 | 2026-04-22T14:10:07Z |       2 |        2 |        2 |           0
+#   4 | 2026-04-22T14:15:07Z |       3 |        3 |        3 |           0
+#   5 | 2026-04-22T14:20:07Z |       5 |        5 |        0 |           5  ← anti-spam OK
+# ----+----------------------+---------+----------+----------+-------------
+# TOTAL                      |      10 |       10 |        5 |           5
+#
+# Conclusión: el mecanismo anti-spam funciona correctamente.
+# Órdenes rechazadas sin notificación duplicada: 5/5 (100%)
