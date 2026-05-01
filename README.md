@@ -1,8 +1,8 @@
-# 🍔 Delivereats - Plataforma de Delivery de Alimentos
+# Delivereats - Plataforma de Delivery de Alimentos
 
-**Proyecto Fase 1 - Software Avanzado A**  
+**Proyecto Fase 3 (Final) – Software Avanzado A**  
 **Universidad de San Carlos de Guatemala**  
-**Facultad de Ingeniería - Escuela de Ciencias y Sistemas**
+**Facultad de Ingeniería – Escuela de Ciencias y Sistemas**
 
 | Dato | Valor |
 |------|-------|
@@ -10,6 +10,49 @@
 | **Carné** | 201346084 |
 | **Curso** | Software Avanzado A |
 | **Catedráticos** | Everest Darwin Medinilla Rodríguez / Juan Pablo Samayoa Ruiz |
+| **Tag de entrega** | `v3.0.0` |
+| **Período** | 19 marzo – 23 abril 2026 |
+
+---
+
+## Fase 3 – DevOps, IaC y Observabilidad
+
+La Fase 3 transforma la infraestructura manual de Fases 1 y 2 a una plataforma completamente automatizada sobre GCP, con observabilidad completa y pipelines de calidad.
+
+### Entregables de Fase 3
+
+| # | Entregable | Evidencia |
+|---|-----------|-----------|
+| 1 | Infraestructura como Código (Terraform) | [`iac/terraform/`](iac/terraform/) – 5 módulos: VPC, GKE, Cloud SQL, Cloud Run, Compute |
+| 2 | Gestión de Configuración (Ansible) | [`iac/ansible/`](iac/ansible/) – role `loadtester`, playbook idempotente |
+| 3 | CronJob rechazo automático + anti-spam | [`k8s/cronjob-order-reject.yaml`](k8s/cronjob-order-reject.yaml) + [`docs/cronjob-execution-logs.txt`](docs/cronjob-execution-logs.txt) |
+| 4 | Stack ELK (Elasticsearch + Kibana + Fluentd) | [`k8s/elk/`](k8s/elk/) + [`docs/dashboards/kibana-delivereats-dashboard.ndjson`](docs/dashboards/kibana-delivereats-dashboard.ndjson) |
+| 5 | Prometheus + Grafana + 4 alertas | [`k8s/monitoring/`](k8s/monitoring/) + [`docs/dashboards/grafana-delivereats-overview.json`](docs/dashboards/grafana-delivereats-overview.json) |
+| 6 | Smoke tests automatizados | [`tests/smoke-test.sh`](tests/smoke-test.sh) |
+| 7 | Pruebas de carga Locust + reporte | [`tests/locustfile.py`](tests/locustfile.py) + [`docs/locust-report.html`](docs/locust-report.html) |
+| 8 | CI/CD: terraform plan + ansible-lint | [`.github/workflows/ci-cd.yaml`](.github/workflows/ci-cd.yaml) |
+| 9 | Documentación Fase 3 | [`docs/DOCUMENTACION_FASE3.md`](docs/DOCUMENTACION_FASE3.md) |
+| 10 | Manual de Observabilidad | [`docs/MANUAL_OBSERVABILIDAD.md`](docs/MANUAL_OBSERVABILIDAD.md) |
+| 11 | SCRUM: backlog + 3 sprints + retrospectivas | [`docs/GESTION_AGIL_FASE3.md`](docs/GESTION_AGIL_FASE3.md) – [Tablero](https://github.com/users/iamjalberto/projects/3) |
+| 12 | Contratos de API actualizados | [`docs/CONTRATOS_API.md`](docs/CONTRATOS_API.md) |
+| 13 | Presentación técnica | [`docs/presentacion-fase3.html`](docs/presentacion-fase3.html) |
+
+### Stack de Infraestructura Fase 3
+
+| Herramienta | Uso |
+|---|---|
+| **Terraform 1.7** | Aprovisionamiento VPC, GKE, Cloud SQL, Cloud Run, VM |
+| **Ansible** | Configuración idempotente de VM load-testing |
+| **Kubernetes (GKE)** | Orquestación de todos los microservicios y CronJobs |
+| **Elasticsearch 8.12** | Almacenamiento y búsqueda de logs centralizados |
+| **Kibana 8.12** | Dashboard de logs por microservicio |
+| **Fluentd** | Recolección de logs desde todos los pods |
+| **Prometheus 2.51** | Métricas de nodos, pods y microservicios |
+| **Grafana 10.4** | Dashboards de observabilidad + 4 alertas |
+| **Locust 2.24** | Pruebas de carga (20 users, 2 min, 8.6 rps) |
+| **GitHub Actions** | CI/CD: lint, test, build, push, deploy |
+
+---
 
 ---
 
