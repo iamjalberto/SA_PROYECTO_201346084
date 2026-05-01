@@ -3,8 +3,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-# Bake the GKE ingress IP as the API URL for Cloud Run
-ARG VITE_API_URL=http://34.132.92.230
+# Use relative /api path so nginx proxies to GKE ingress (avoids Mixed Content over HTTPS)
+ARG VITE_API_URL=/api
 ENV VITE_API_URL=${VITE_API_URL}
 RUN npm run build
 
