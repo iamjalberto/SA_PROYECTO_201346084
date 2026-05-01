@@ -16,7 +16,7 @@ resource "google_cloud_run_v2_service" "frontend" {
       image = var.image
 
       ports {
-        container_port = 80
+        container_port = 8080
       }
 
       env {

@@ -28,7 +28,7 @@ data:
   # Database common config
   DB_PORT: "5432"
   DB_USER: "postgres"
-  DB_HOST: "localhost"
+  DB_HOST: "10.198.112.3"
   # Flask / FX
   FLASK_PORT: "5000"
   GRPC_PORT: "50056"

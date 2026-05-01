@@ -84,7 +84,7 @@ variable "disk_size_gb" {
 variable "db_instance_name" {
   description = "Cloud SQL instance name"
   type        = string
-  default     = "delivereats-sqlserver"
+  default     = "delivereats-postgres"
 }
 
 variable "db_password" {

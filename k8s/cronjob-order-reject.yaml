@@ -37,8 +37,8 @@ spec:
               env:
                 - name: DB_HOST
                   valueFrom:
-                    secretKeyRef:
-                      name: delivereats-secrets
+                    configMapKeyRef:
+                      name: delivereats-config
                       key: DB_HOST
                 - name: DB_PORT
                   valueFrom:

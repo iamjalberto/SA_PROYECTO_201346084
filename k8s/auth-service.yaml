@@ -25,8 +25,8 @@ spec:
     spec:
       containers:
         - name: auth-service
-          image: ghcr.io/jalbertochigua/delivereats/auth-service:latest
-          imagePullPolicy: IfNotPresent
+          image: us-central1-docker.pkg.dev/usac-sa-201346084/delivereats/auth-service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 50051
           envFrom:
@@ -39,9 +39,6 @@ spec:
               value: "50051"
             - name: DB_NAME
               value: "auth_db"
-          volumeMounts:
-            - name: auth-db-data
-              mountPath: /var/lib/postgresql/data
           resources:
             requests:
               memory: "128Mi"
@@ -50,19 +47,15 @@ spec:
               memory: "512Mi"
               cpu: "500m"
           readinessProbe:
-            exec:
-              command: ["sh", "-c", "pg_isready -U postgres"]
+            tcpSocket:
+              port: 50051
             initialDelaySeconds: 15
             periodSeconds: 10
           livenessProbe:
-            exec:
-              command: ["sh", "-c", "pg_isready -U postgres"]
+            tcpSocket:
+              port: 50051
             initialDelaySeconds: 30
             periodSeconds: 15
-      volumes:
-        - name: auth-db-data
-          persistentVolumeClaim:
-            claimName: auth-db-pvc
 ---
 apiVersion: v1
 kind: Service

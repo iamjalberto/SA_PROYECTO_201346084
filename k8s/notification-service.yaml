@@ -25,8 +25,8 @@ spec:
     spec:
       containers:
         - name: notification-service
-          image: ghcr.io/jalbertochigua/delivereats/notification-service:latest
-          imagePullPolicy: IfNotPresent
+          image: us-central1-docker.pkg.dev/usac-sa-201346084/delivereats/notification-service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 50055
           envFrom:

@@ -1,6 +1,6 @@
 # ============================================
 # Delivereats CI/CD Pipeline
-# Build → Test → Push Images → Deploy to K8s
+# Validate → Test → Build+Push → Deploy GKE → Ansible → Smoke
 # ============================================
 name: Delivereats CI/CD
 
@@ -11,8 +11,11 @@ on:
     branches: [main]
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/delivereats
+  GCP_REGION: us-central1
+  GCP_ZONE: us-central1-a
+  GKE_CLUSTER: delivereats-gke
+  AR_REGISTRY: us-central1-docker.pkg.dev
+  AR_REPO: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/delivereats
 
 jobs:
   # ==========================================
@@ -42,22 +45,17 @@ jobs:
         working-directory: iac/terraform
         run: terraform validate
 
-      - name: Terraform Plan
+      - name: Terraform Plan (syntax check)
         working-directory: iac/terraform
         env:
           TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
-          TF_VAR_db_admin_password: ${{ secrets.DB_ADMIN_PASSWORD }}
-          TF_VAR_loadtest_ssh_pubkey: ${{ secrets.LOADTEST_SSH_PUBKEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_ssh_pub_key: ${{ secrets.LOADTEST_SSH_PUBKEY }}
+          TF_VAR_frontend_image: "${{ env.AR_REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/delivereats/frontend:latest"
+          TF_VAR_api_gateway_url: "http://placeholder"
           GOOGLE_CREDENTIALS: ${{ secrets.GCP_SA_KEY }}
-        run: terraform plan -input=false -out=tfplan
+        run: terraform plan -input=false
         continue-on-error: true
-
-      - name: Upload Terraform Plan
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-plan
-          path: iac/terraform/tfplan
-          retention-days: 7
 
   # ==========================================
   # JOB 0b: Ansible Lint
@@ -82,7 +80,7 @@ jobs:
         run: ansible-lint playbooks/setup-loadtest.yml
 
   # ==========================================
-  # JOB 1: Build & Test
+  # JOB 1: Unit Tests
   # ==========================================
   test:
     name: "🧪 Test Services"
@@ -140,16 +138,13 @@ jobs:
         continue-on-error: false
 
   # ==========================================
-  # JOB 2: Build & Push Docker Images
+  # JOB 2: Build & Push to Artifact Registry
   # ==========================================
   build-and-push:
     name: "🐳 Build & Push Images"
     runs-on: ubuntu-latest
     needs: [terraform-validate, ansible-lint, test, test-python]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-      packages: write
     strategy:
       matrix:
         include:
@@ -171,22 +166,26 @@ jobs:
             context: ./api-gateway
           - service: frontend
             context: ./frontend
+          - service: frontend-cloudrun
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile.cloudrun
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.AR_REGISTRY }} --quiet
 
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_PREFIX }}/${{ matrix.service }}
+          images: ${{ env.AR_REPO }}/${{ matrix.service }}
           tags: |
             type=sha,prefix=
             type=raw,value=latest
@@ -196,125 +195,217 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile || format('{0}/Dockerfile', matrix.context) }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
   # ==========================================
-  # JOB 3: Deploy to Kubernetes (k3s on GCP VM)
+  # JOB 3: Deploy to GKE
   # ==========================================
   deploy:
-    name: "🚀 Deploy to Kubernetes"
+    name: "🚀 Deploy to GKE"
     runs-on: ubuntu-latest
-    needs: [terraform-validate, ansible-lint, test, test-python]
+    needs: [build-and-push]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup SSH key
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: gke-gcloud-auth-plugin
+
+      - name: Get GKE credentials
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+            --zone ${{ env.GCP_ZONE }} \
+            --project ${{ secrets.GCP_PROJECT_ID }}
 
-      - name: Pull latest code on VM
+      - name: Install nginx ingress controller
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} 'cd ~/SA_PROYECTO_201346084 && git pull origin main'
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/cloud/deploy.yaml || true
+          kubectl wait --namespace ingress-nginx \
+            --for=condition=ready pod \
+            --selector=app.kubernetes.io/component=controller \
+            --timeout=120s || true
 
-      - name: Build and import Docker images on VM
+      - name: Deploy application manifests
+        env:
+          AR_REPO: ${{ env.AR_REPO }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} 'bash -s' << 'SSHEOF'
-            set -e
-            cd ~/SA_PROYECTO_201346084
-            SERVICES="auth-service restaurant-catalog-service order-service delivery-service notification-service fx-service payment-service api-gateway frontend"
-            for svc in $SERVICES; do
-              echo "🐳 Building $svc..."
-              docker build -t ghcr.io/jalbertochigua/delivereats/$svc:latest ./$svc/
-              echo "📦 Importing $svc to k3s..."
-              docker save ghcr.io/jalbertochigua/delivereats/$svc:latest | sudo k3s ctr images import -
-            done
-            echo "✅ All images built and imported"
-          SSHEOF
+          # Sustituir imagen en manifests con la versión del run
+          TAG="${{ github.run_number }}"
+          for svc in auth-service restaurant-catalog-service order-service delivery-service notification-service fx-service payment-service api-gateway frontend; do
+            sed -i "s|image: us-central1-docker.pkg.dev/.*/delivereats/${svc}:.*|image: ${AR_REPO}/${svc}:${TAG}|g" k8s/${svc}.yaml 2>/dev/null || true
+          done
 
-      - name: Deploy to Kubernetes
+          # Namespace y configuración base
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/secrets.yaml
+          kubectl apply -f k8s/persistent-volumes.yaml
+
+          # Infraestructura (Redis, RabbitMQ)
+          kubectl apply -f k8s/redis.yaml
+          kubectl apply -f k8s/rabbitmq.yaml
+          kubectl rollout status deployment/redis -n delivereats --timeout=180s
+          kubectl rollout status deployment/rabbitmq -n delivereats --timeout=180s
+
+          # Microservicios
+          kubectl apply -f k8s/auth-service.yaml
+          kubectl apply -f k8s/restaurant-catalog-service.yaml
+          kubectl apply -f k8s/order-service.yaml
+          kubectl apply -f k8s/delivery-service.yaml
+          kubectl apply -f k8s/notification-service.yaml
+          kubectl apply -f k8s/fx-service.yaml
+          kubectl apply -f k8s/payment-service.yaml
+          kubectl apply -f k8s/api-gateway.yaml
+          kubectl apply -f k8s/frontend.yaml
+
+          # CronJobs
+          kubectl apply -f k8s/configmap-order-reject-script.yaml
+          kubectl apply -f k8s/cronjob-order-reject.yaml
+
+          # Ingress
+          kubectl apply -f k8s/ingress.yaml
+
+          # Esperar rollout de servicios críticos
+          for svc in auth-service restaurant-catalog-service order-service api-gateway frontend; do
+            kubectl rollout status deployment/${svc} -n delivereats --timeout=300s
+          done
+
+      - name: Deploy observability stack (ELK)
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} 'bash -s' << 'SSHEOF'
-            set -e
-            cd ~/SA_PROYECTO_201346084
+          kubectl apply -f k8s/elk/00-namespace.yaml
+          kubectl apply -f k8s/elk/01-elasticsearch.yaml
+          kubectl rollout status statefulset/elasticsearch -n logging --timeout=300s || \
+            kubectl rollout status deployment/elasticsearch -n logging --timeout=300s || true
+          kubectl apply -f k8s/elk/02-kibana.yaml
+          kubectl apply -f k8s/elk/03-fluentd-configmap.yaml
+          kubectl apply -f k8s/elk/04-fluentd-daemonset.yaml
+          kubectl apply -f k8s/elk/05-kibana-ingress.yaml
 
-            echo "🔄 Deploying to k3s cluster"
-
-            # Aplicar namespace y configuración
-            sudo kubectl apply -f k8s/namespace.yaml
-            sudo kubectl apply -f k8s/configmap.yaml
-            sudo kubectl apply -f k8s/secrets.yaml
-            sudo kubectl apply -f k8s/persistent-volumes.yaml
-
-            # Aplicar infraestructura (Redis, RabbitMQ)
-            sudo kubectl apply -f k8s/redis.yaml
-            sudo kubectl apply -f k8s/rabbitmq.yaml
-
-            # Esperar a que Redis y RabbitMQ estén listos
-            sudo kubectl rollout status deployment/redis -n delivereats --timeout=120s || true
-            sudo kubectl rollout status deployment/rabbitmq -n delivereats --timeout=180s || true
-
-            # Aplicar microservicios
-            sudo kubectl apply -f k8s/auth-service.yaml
-            sudo kubectl apply -f k8s/restaurant-catalog-service.yaml
-            sudo kubectl apply -f k8s/order-service.yaml
-            sudo kubectl apply -f k8s/delivery-service.yaml
-            sudo kubectl apply -f k8s/notification-service.yaml
-            sudo kubectl apply -f k8s/fx-service.yaml
-            sudo kubectl apply -f k8s/payment-service.yaml
-
-            # Aplicar API Gateway y Frontend
-            sudo kubectl apply -f k8s/api-gateway.yaml
-            sudo kubectl apply -f k8s/frontend.yaml
-
-            # Aplicar Ingress
-            sudo kubectl apply -f k8s/ingress.yaml
-
-            # Restart deployments para tomar las imágenes nuevas
-            SERVICES="auth-service restaurant-catalog-service order-service delivery-service notification-service fx-service payment-service api-gateway frontend"
-            for svc in $SERVICES; do
-              sudo kubectl rollout restart deployment/$svc -n delivereats || true
-            done
-
-            echo "✅ Deployment complete!"
-          SSHEOF
+      - name: Deploy monitoring stack (Prometheus + Grafana)
+        run: |
+          kubectl apply -f k8s/monitoring/00-namespace.yaml
+          kubectl apply -f k8s/monitoring/01-prometheus-config.yaml
+          kubectl apply -f k8s/monitoring/02-prometheus.yaml
+          kubectl apply -f k8s/monitoring/03-node-exporter.yaml
+          kubectl apply -f k8s/monitoring/04-grafana.yaml
+          kubectl apply -f k8s/monitoring/05-monitoring-ingress.yaml
 
       - name: Verify deployment
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'SSHEOF'
-            export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-            echo "=== Deployment Status ==="
-            sudo kubectl get deployments -n delivereats
-            echo ""
-            echo "=== Pods Status ==="
-            sudo kubectl get pods -n delivereats
-            echo ""
-            echo "=== Services ==="
-            sudo kubectl get services -n delivereats
-            echo ""
-            echo "=== Ingress ==="
-            sudo kubectl get ingress -n delivereats
-          SSHEOF
+          echo "=== Pods: delivereats ==="
+          kubectl get pods -n delivereats
+          echo "=== Pods: logging ==="
+          kubectl get pods -n logging
+          echo "=== Pods: monitoring ==="
+          kubectl get pods -n monitoring
+          echo "=== Ingress ==="
+          kubectl get ingress -n delivereats
+          echo "=== Ingress IP ==="
+          kubectl get svc -n ingress-nginx ingress-nginx-controller
 
       - name: Rollback on failure
         if: failure()
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'SSHEOF'
-            export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-            echo "❌ Deployment failed! Rolling back..."
-            SERVICES="auth-service restaurant-catalog-service order-service delivery-service notification-service fx-service payment-service api-gateway frontend"
-            for svc in $SERVICES; do
-              sudo kubectl rollout undo deployment/$svc -n delivereats || true
-            done
-            echo "🔄 Rollback complete"
-          SSHEOF
+          echo "❌ Deployment failed – rolling back microservices"
+          for svc in auth-service restaurant-catalog-service order-service delivery-service notification-service fx-service payment-service api-gateway frontend; do
+            kubectl rollout undo deployment/${svc} -n delivereats || true
+          done
+
+  # ==========================================
+  # JOB 4: Configure Load-Test VM with Ansible
+  # ==========================================
+  ansible-provision:
+    name: "⚙️ Ansible: Provision Load-Test VM"
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Ansible
+        run: pip install ansible==9.4.0
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.LOADTEST_SSH_KEY }}" > ~/.ssh/loadtest_key
+          chmod 600 ~/.ssh/loadtest_key
+
+      - name: Update inventory with real VM IP
+        run: |
+          sed -i "s/LOAD_TEST_VM_IP/${{ secrets.LOADTEST_VM_IP }}/g" iac/ansible/inventory/hosts.ini
+          sed -i "s|ansible_ssh_private_key_file=.*|ansible_ssh_private_key_file=~/.ssh/loadtest_key|g" iac/ansible/inventory/hosts.ini
+
+      - name: Run Ansible playbook
+        run: |
+          ansible-playbook \
+            -i iac/ansible/inventory/hosts.ini \
+            iac/ansible/playbooks/setup-loadtest.yml \
+            --ssh-extra-args="-o StrictHostKeyChecking=no"
 
       - name: Cleanup SSH key
         if: always()
-        run: rm -f ~/.ssh/deploy_key
+        run: rm -f ~/.ssh/loadtest_key
+
+  # ==========================================
+  # JOB 5: Smoke Tests
+  # ==========================================
+  smoke-tests:
+    name: "🔬 Smoke Tests"
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: gke-gcloud-auth-plugin
+
+      - name: Get ingress IP
+        id: ingress
+        run: |
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+            --zone ${{ env.GCP_ZONE }} \
+            --project ${{ secrets.GCP_PROJECT_ID }}
+          # Esperar hasta que el Ingress tenga IP
+          for i in $(seq 1 20); do
+            IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller \
+              -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+            if [[ -n "$IP" ]]; then
+              echo "ip=$IP" >> "$GITHUB_OUTPUT"
+              echo "Ingress IP: $IP"
+              break
+            fi
+            echo "Waiting for Ingress IP... ($i/20)"
+            sleep 15
+          done
+
+      - name: Run smoke tests
+        run: |
+          BASE_URL="http://${{ steps.ingress.outputs.ip }}" bash tests/smoke-test.sh

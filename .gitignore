@@ -15,3 +15,10 @@ package-lock.json
 GUIA_CALIFICACION*.md
 GUIA_CALIFICACION*.html
 CHECKLIST_ENTREGA_FASE3.md
+
+# Terraform secrets
+iac/terraform/terraform.tfvars
+iac/terraform/*.tfstate
+iac/terraform/*.tfstate.backup
+iac/terraform/tfplan*
+iac/terraform/.terraform/

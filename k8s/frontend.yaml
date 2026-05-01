@@ -25,8 +25,8 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/jalbertochigua/delivereats/frontend:latest
-          imagePullPolicy: IfNotPresent
+          image: us-central1-docker.pkg.dev/usac-sa-201346084/delivereats/frontend:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           resources:
