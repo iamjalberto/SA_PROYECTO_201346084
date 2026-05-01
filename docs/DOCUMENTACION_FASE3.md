@@ -5,7 +5,7 @@
 **Universidad**: San Carlos de Guatemala  
 **Carnet**: 201346084  
 **Fase**: 3  
-**Período**: Marzo 19 – Abril 23, 2026  
+**Período**: Marzo 19 – Abril 30, 2026  
 
 ---
 

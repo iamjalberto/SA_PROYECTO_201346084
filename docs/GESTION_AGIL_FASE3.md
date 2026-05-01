@@ -3,7 +3,7 @@
 
 **Proyecto**: Delivereats – Fase 3 (DevOps & Observabilidad)  
 **Carnet**: 201346084  
-**Período**: 19 de marzo – 23 de abril de 2026  
+**Período**: 19 de marzo – 30 de abril de 2026  
 **Tablero ágil**: https://github.com/users/iamjalberto/projects/3
 
 ---
@@ -75,7 +75,7 @@
 ---
 
 ### Sprint 3 – Métricas, Tests y CI/CD
-**Fecha**: 11 abr – 22 abr 2026  
+**Fecha**: 11 abr – 30 abr 2026  
 **Objetivo**: Stack de monitoreo completo. Tests de carga automatizados. Pipeline validado.
 
 | Tarea | Estado | Responsable |
