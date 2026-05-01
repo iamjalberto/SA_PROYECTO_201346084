@@ -73,7 +73,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install ansible-lint
-        run: pip install ansible-core ansible-lint==24.2.0
+        run: pip install "ansible-core>=2.15,<2.18" "ansible-lint==24.2.0"
 
       - name: Run ansible-lint
         working-directory: iac/ansible
@@ -341,7 +341,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install Ansible
-        run: pip install ansible==9.4.0
+        run: pip install "ansible-core>=2.15,<2.18" ansible==9.4.0
 
       - name: Setup SSH key
         run: |
