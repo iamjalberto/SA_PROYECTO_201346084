@@ -73,7 +73,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install ansible-lint
-        run: pip install ansible-lint==24.2.0
+        run: pip install ansible-core ansible-lint==24.2.0
 
       - name: Run ansible-lint
         working-directory: iac/ansible
