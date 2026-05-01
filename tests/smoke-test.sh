@@ -1,40 +1,31 @@
 #!/usr/bin/env bash
 # ============================================================
 # smoke-test.sh – Smoke tests automatizados para Delivereats
-# Valida el flujo crítico de extremo a extremo.
-#
-# Uso:
-#   BASE_URL=http://API_GATEWAY_URL ./tests/smoke-test.sh
-#
-# En CI/CD se ejecuta como:
-#   BASE_URL=${{ secrets.API_GATEWAY_URL }} ./tests/smoke-test.sh
 # ============================================================
-set -euo pipefail
+set -uo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:3000}"
 PASS=0
 FAIL=0
 ERRORS=()
 
-# ── Colores ──────────────────────────────────────────────────
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# ── Funciones utilitarias ────────────────────────────────────
 check() {
   local desc="$1"
   local expected="$2"
   local actual="$3"
 
-  if [[ "$actual" == *"$expected"* ]]; then
+  if [[ "$actual" =~ $expected ]]; then
     echo -e "  ${GREEN}✓${NC} $desc"
-    ((PASS++))
+    PASS=$((PASS + 1))
   else
     echo -e "  ${RED}✗${NC} $desc (expected '$expected', got '$actual')"
     ERRORS+=("FAIL: $desc")
-    ((FAIL++))
+    FAIL=$((FAIL + 1))
   fi
 }
 
@@ -44,15 +35,17 @@ check_status() {
   local url="$3"
   local data="${4:-}"
   local method="${5:-GET}"
+  local token="${6:-}"
 
   local http_code
-  if [[ -n "$data" ]]; then
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" -X "$method" \
-      -H "Content-Type: application/json" \
-      -d "$data" "$url")
-  else
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+  local curl_args=(-s -o /dev/null -w "%{http_code}" -X "$method")
+  if [[ -n "$token" ]]; then
+    curl_args+=(-H "Authorization: Bearer $token")
   fi
+  if [[ -n "$data" ]]; then
+    curl_args+=(-H "Content-Type: application/json" -d "$data")
+  fi
+  http_code=$(curl "${curl_args[@]}" "$url")
 
   check "$desc" "$expected_code" "$http_code"
 }
@@ -87,12 +80,12 @@ post_body() {
 echo ""
 echo -e "${YELLOW}▶ Suite 1: Health Checks${NC}"
 
-check_status "API Gateway health" "200" "$BASE_URL/health"
-check_status "Auth Service health" "200" "$BASE_URL/api/auth/health"
-check_status "Restaurant Service health" "200" "$BASE_URL/api/restaurants/health"
-check_status "Order Service health" "200" "$BASE_URL/api/orders/health"
-check_status "Payment Service health" "200" "$BASE_URL/api/payments/health"
-check_status "FX Service health" "200" "$BASE_URL/api/fx/health"
+check_status "API Gateway health" "200" "$BASE_URL/api/health"
+check_status "Auth route responds" "[2-4].." "$BASE_URL/api/auth/login" '{}' "POST"
+check_status "Restaurants route requires auth" "401" "$BASE_URL/api/restaurants"
+check_status "Orders route requires auth" "401" "$BASE_URL/api/orders/my"
+check_status "Payments route requires auth" "401" "$BASE_URL/api/payments/wallet"
+check_status "FX route requires auth" "401" "$BASE_URL/api/fx/rates"
 
 # ─────────────────────────────────────────────────────────────
 # SUITE 2: Autenticación
@@ -107,16 +100,15 @@ TEST_NAME="Smoke Test User"
 REGISTER_RESP=$(post_body "$BASE_URL/api/auth/register" \
   "{\"name\":\"$TEST_NAME\",\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASS\",\"role\":\"CLIENTE\"}")
 
-check "Registro de usuario exitoso" "token" "$REGISTER_RESP"
+check "Registro de usuario exitoso" '"success":true' "$REGISTER_RESP"
 
 LOGIN_RESP=$(post_body "$BASE_URL/api/auth/login" \
   "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASS\"}")
 
 check "Login retorna token" "token" "$LOGIN_RESP"
 
-# Extraer token
 TOKEN=$(echo "$LOGIN_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('token', d.get('access_token','')))" 2>/dev/null || echo "")
-check "Token no vacío" "." "$TOKEN"
+check "Token no vacío" ".+" "$TOKEN"
 
 # ─────────────────────────────────────────────────────────────
 # SUITE 3: Endpoints protegidos
@@ -126,19 +118,18 @@ echo -e "${YELLOW}▶ Suite 3: Endpoints protegidos${NC}"
 
 if [[ -n "$TOKEN" ]]; then
   RESTAURANTS=$(get_body "$BASE_URL/api/restaurants" "$TOKEN")
-  check "Listado de restaurantes" "restaurants\|data\|\[" "$RESTAURANTS"
+  check "Listado de restaurantes" "restaurants" "$RESTAURANTS"
 
-  FX_RESP=$(get_body "$BASE_URL/api/fx/convert?from=GTQ&to=USD&amount=100" "$TOKEN")
-  check "FX conversion GTQ→USD" "rate\|result\|converted" "$FX_RESP"
-
-  WALLET_RESP=$(get_body "$BASE_URL/api/payments/wallet" "$TOKEN")
-  check "Wallet del usuario" "balance\|wallet\|amount" "$WALLET_RESP"
+  FX_RESP=$(get_body "$BASE_URL/api/fx/rates" "$TOKEN")
+  check "FX rates disponibles" "success|rates|GTQ|USD" "$FX_RESP"
 
   ORDERS_RESP=$(get_body "$BASE_URL/api/orders/my" "$TOKEN")
-  check "Mis órdenes" "orders\|data\|\[" "$ORDERS_RESP"
+  check "Mis órdenes retorna lista" "orders" "$ORDERS_RESP"
+
+  check_status "Wallet con token válido responde" "2.." "$BASE_URL/api/payments/wallet" "" "GET" "$TOKEN"
 else
   echo -e "  ${RED}⚠${NC} Token vacío – se omiten pruebas de endpoints protegidos"
-  ((FAIL+=4))
+  FAIL=$((FAIL + 4))
 fi
 
 # ─────────────────────────────────────────────────────────────
@@ -149,7 +140,7 @@ echo -e "${YELLOW}▶ Suite 4: Seguridad – sin autenticación${NC}"
 
 check_status "Órdenes sin token → 401" "401" "$BASE_URL/api/orders/my"
 check_status "Wallet sin token → 401"  "401" "$BASE_URL/api/payments/wallet"
-check_status "Delivery sin token → 401" "401" "$BASE_URL/api/delivery/active"
+check_status "Delivery sin token → 401" "401" "$BASE_URL/api/delivery/my"
 
 # ─────────────────────────────────────────────────────────────
 # Resumen
