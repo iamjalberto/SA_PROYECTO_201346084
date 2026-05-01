@@ -30,46 +30,55 @@ En la Fase 2 se construyó la plataforma Delivereats como un conjunto de microse
 
 ### Diagrama de Arquitectura Fase 3
 
-```
-┌─────────────────────── GCP ──────────────────────────────────────────┐
-│                                                                        │
-│  ┌──────── VPC: delivereats-vpc ────────────────────────────────────┐ │
-│  │                                                                    │ │
-│  │   ┌──── Subnet: delivereats-subnet (10.0.0.0/20) ─────────────┐  │ │
-│  │   │                                                              │  │ │
-│  │   │   ┌─────────────── GKE Cluster ───────────────────────┐    │  │ │
-│  │   │   │  Namespace: delivereats                            │    │  │ │
-│  │   │   │    auth-service, restaurant-catalog-service        │    │  │ │
-│  │   │   │    order-service, delivery-service                 │    │  │ │
-│  │   │   │    notification-service, payment-service           │    │  │ │
-│  │   │   │    api-gateway, frontend                           │    │  │ │
-│  │   │   │    RabbitMQ, Redis                                 │    │  │ │
-│  │   │   │    CronJob: auto-reject-orders                     │    │  │ │
-│  │   │   │                                                    │    │  │ │
-│  │   │   │  Namespace: logging                                │    │  │ │
-│  │   │   │    Elasticsearch, Kibana, Fluentd                  │    │  │ │
-│  │   │   │                                                    │    │  │ │
-│  │   │   │  Namespace: monitoring                             │    │  │ │
-│  │   │   │    Prometheus, Grafana, Node Exporter              │    │  │ │
-│  │   │   └────────────────────────────────────────────────────┘    │  │ │
-│  │   │                                                              │  │ │
-│  │   │   ┌──── Cloud SQL (SQL Server 2019) ──────────────────┐    │  │ │
-│  │   │   │  FUERA del cluster – VPC Peering                   │    │  │ │
-│  │   │   │  delivereats-db (db-custom-4-15360)                │    │  │ │
-│  │   │   └────────────────────────────────────────────────────┘    │  │ │
-│  │   │                                                              │  │ │
-│  │   │   ┌──── Compute Engine VM (load-test) ────────────────┐    │  │ │
-│  │   │   │  e2-medium, Ubuntu 22.04                           │    │  │ │
-│  │   │   │  Locust instalado via Ansible                      │    │  │ │
-│  │   │   └────────────────────────────────────────────────────┘    │  │ │
-│  │   └──────────────────────────────────────────────────────────────┘  │ │
-│  │                                                                    │ │
-│  └────────────────────────────────────────────────────────────────────┘ │
-│                                                                        │
-│  ┌── Cloud Run ─────────────────────────────────────────────────────┐ │
-│  │  frontend (serverless – opcional)                                  │ │
-│  └────────────────────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph GCP["☁️ GCP – Proyecto usac-sa-201346084"]
+        subgraph VPC["VPC: delivereats-vpc"]
+            subgraph Subnet["Subnet: delivereats-subnet 10.0.0.0/20"]
+                subgraph GKE["GKE Cluster: delivereats-gke"]
+                    subgraph NS_APP["Namespace: delivereats"]
+                        INGRESS["Ingress NGINX\n34.132.92.230"]
+                        GW["api-gateway"]
+                        FE["frontend"]
+                        AUTH["auth-service"]
+                        REST["restaurant-catalog-service"]
+                        ORD["order-service"]
+                        DEL["delivery-service"]
+                        NOT["notification-service"]
+                        PAY["payment-service"]
+                        FX["fx-service"]
+                        RMQ["RabbitMQ"]
+                        REDIS["Redis"]
+                        CRON["CronJob\nauto-reject-orders"]
+                    end
+                    subgraph NS_LOG["Namespace: logging"]
+                        ES["Elasticsearch"]
+                        KB["Kibana"]
+                        FD["Fluentd DaemonSet"]
+                    end
+                    subgraph NS_MON["Namespace: monitoring"]
+                        PROM["Prometheus"]
+                        GRAF["Grafana"]
+                        NE["Node Exporter"]
+                    end
+                end
+                DB[("Cloud SQL\nPostgreSQL\n10.198.112.3")]
+                VM["Compute VM\ne2-medium\nLocust load-test"]
+            end
+        end
+        CR["Cloud Run\nfrontend-cloudrun\n(serverless)"]
+    end
+
+    Internet(["Internet"]) --> INGRESS
+    INGRESS --> GW & FE
+    GW --> AUTH & REST & ORD & DEL & NOT & PAY & FX
+    AUTH & REST & ORD & DEL & PAY --> DB
+    ORD & DEL & NOT --> RMQ
+    AUTH --> REDIS
+    FD --> ES --> KB
+    NE & PROM --> GRAF
+    Internet --> CR
+    VM -. "load test" .-> INGRESS
 ```
 
 ---
@@ -220,18 +229,22 @@ El CronJob `auto-reject-orders` se ejecuta cada 5 minutos y rechaza automáticam
 
 ### Arquitectura de Logs
 
-```
-Pods (stdout/stderr)
-     │
-     ▼
-Fluentd DaemonSet
-     │ (lee /var/log/containers/*.log)
-     │ (enruta por app label)
-     ▼
-Elasticsearch (StatefulSet, 10Gi PVC)
-     │
-     ▼
-Kibana (UI, Ingress: kibana.delivereats.local)
+```mermaid
+flowchart LR
+    subgraph Pods["Pods (namespace: delivereats)"]
+        P1["auth-service\nstdout/stderr"]
+        P2["order-service\nstdout/stderr"]
+        P3["api-gateway\nstdout/stderr"]
+        PN["... otros pods"]
+    end
+
+    FD["Fluentd DaemonSet\n/var/log/containers/*.log\nenruta por label app="]
+    ES[("Elasticsearch\nStatefulSet\n10Gi PVC")]
+    KB["Kibana\nUI + Ingress\n/kibana"]
+
+    P1 & P2 & P3 & PN -->|"logs"| FD
+    FD -->|"índices delivereats-{svc}.*"| ES
+    ES --> KB
 ```
 
 ### Índices por microservicio
@@ -357,12 +370,24 @@ Exit code: `0` si todo pasa, `1` si algún test falla.
 
 La Fase 3 agrega dos nuevos jobs al inicio del pipeline:
 
-```
-terraform-validate ──┐
-                      ├── build-and-push ──── deploy
-ansible-lint ─────────┤
-test ─────────────────┤
-test-python ──────────┘
+```mermaid
+flowchart LR
+    TF["🏗️ terraform-validate"]
+    AL["📋 ansible-lint"]
+    TS["🧪 test-services"]
+    FX["🐍 test-fx-service"]
+    BP["🐳 build-and-push"]
+    DK["🚀 deploy-to-gke"]
+    SM["🔬 smoke-tests"]
+    AN["⚙️ ansible-provision"]
+
+    TF --> BP
+    AL --> BP
+    TS --> BP
+    FX --> BP
+    BP --> DK
+    DK --> SM
+    DK --> AN
 ```
 
 ### Job: `terraform-validate`
@@ -467,31 +492,56 @@ La Fase 3 no introduce nuevos actores de negocio pero incorpora dos flujos nuevo
 
 La Fase 3 agrega una tabla al esquema existente de Fase 2: `order_notifications`, necesaria para el mecanismo anti-spam del CronJob.
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│  NOVEDADES FASE 3 (resaltadas con **)                               │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+erDiagram
+    orders {
+        int id PK
+        int customer_id
+        string customer_email
+        int restaurant_id
+        string status
+        timestamp created_at
+        timestamp updated_at
+    }
+    order_notifications {
+        int id PK
+        int order_id FK
+        string type
+        timestamp sent_at
+        string channel
+    }
+    users {
+        int id PK
+        string name
+        string email
+        string role
+    }
+    restaurants {
+        int id PK
+        string name
+        int owner_id FK
+    }
+    order_items {
+        int id PK
+        int order_id FK
+        int product_id
+        int quantity
+        decimal unit_price
+    }
+    payments {
+        int id PK
+        int order_id FK
+        decimal amount
+        string status
+        timestamp created_at
+    }
 
-┌──────────────────┐          ┌────────────────────────────────────┐
-│     orders       │          │  ** order_notifications **         │
-├──────────────────┤  1 ─── N ├────────────────────────────────────┤
-│ id         (PK)  │──────────│ id          (PK)                   │
-│ customer_id      │          │ order_id    (FK → orders.id)       │
-│ customer_email   │          │ type        VARCHAR(20)            │
-│ restaurant_id    │          │             ('RECHAZO','CONFIRMADO')│
-│ status           │          │ sent_at     TIMESTAMP              │
-│   CREADA         │          │ channel     VARCHAR(10) ('EMAIL')  │
-│   ACEPTADA       │          └────────────────────────────────────┘
-│   RECHAZADA      │
-│   ENTREGADA      │
-│ created_at       │          Propósito: registra qué notificaciones
-│ updated_at       │          ya fueron enviadas para evitar spam   
-└──────────────────┘          (verificada antes de cada envío).    
-
- TABLAS HEREDADAS DE FASE 2 (sin cambios estructurales):
- ┌───────────┐  ┌────────────┐  ┌──────────────┐  ┌──────────┐
- │  users    │  │restaurants │  │ order_items  │  │ payments │
- └───────────┘  └────────────┘  └──────────────┘  └──────────┘
+    orders ||--o{ order_notifications : "1 → N (anti-spam)"
+    orders ||--o{ order_items : "contiene"
+    orders }o--|| users : "realizada por"
+    orders }o--|| restaurants : "pertenece a"
+    orders ||--o| payments : "tiene"
+    restaurants }o--|| users : "administrada por"
 ```
 
 ### DDL de la tabla nueva
